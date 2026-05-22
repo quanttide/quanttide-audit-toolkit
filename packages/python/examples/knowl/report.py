@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from app.audit.models import AuditMode, AuditDiff, AuditReport as AuditIssues, IssueGroup, AuditIssue, KnowledgeBaseStats
+from .models import AuditMode, AuditDiff, AuditReport as AuditIssues, IssueGroup, AuditIssue, KnowledgeBaseStats
 
 
 # ── domain model ──────────────────────────────────────────────────────────

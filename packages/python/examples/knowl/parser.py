@@ -1,7 +1,7 @@
 import re
 from typing import Optional
 
-from app.audit.models import AuditIssue
+from .models import AuditIssue
 
 MISS_TAG = "[MISS] "
 FAIL_TAG = "[FAIL] "

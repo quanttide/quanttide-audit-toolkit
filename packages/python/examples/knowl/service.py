@@ -1,12 +1,12 @@
 from pathlib import Path
 from typing import Optional
 
-from app.agents.tools import all_detection_tools
-from app.audit.models import AuditMode, AuditIssue, KnowledgeBaseStats
-from app.audit.parser import ToolOutputParser
-from app.audit.report import Report, ReportRepository
-from app.config import settings
-from app.knowl_loader import load_all_domains
+from .tools import all_detection_tools
+from .models import AuditMode, AuditIssue, KnowledgeBaseStats
+from .parser import ToolOutputParser
+from .report import Report, ReportRepository
+from .config import settings
+from .loader import load_all_domains
 
 
 def _collect_stats(ddir):
