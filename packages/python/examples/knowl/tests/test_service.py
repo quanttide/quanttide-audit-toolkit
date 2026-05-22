@@ -3,7 +3,9 @@ from uuid import uuid4
 
 from quanttide_audit import AuditCriteria, AuditFinding, AuditSeverity
 
-from examples.knowl.service import TS, run
+from examples.knowl.service import run
+
+TS = "2026-01-01T00:00:00"
 
 _CRITERIA_UUIDS = {
     "file-structure": "11111111-1111-1111-1111-111111111111",

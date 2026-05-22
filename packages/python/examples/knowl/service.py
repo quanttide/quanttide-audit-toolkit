@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import uuid4
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from .render import render_report
 from .repository import ReportRepository
 
 
-TS = "2026-01-01T00:00:00"
+_now = lambda: datetime.now().isoformat()
 
 
 def _finding_key(f: AuditFinding) -> str:
@@ -22,7 +23,7 @@ def run(findings: list[AuditFinding], mode: str = "full", state_dir: Path = Path
     audit_report = AuditReport(
         id=uuid4(), name="knowl-audit-demo", title="知识库审计示例",
         findings=findings,
-        created_at=TS, updated_at=TS,
+        created_at=_now(), updated_at=_now(),
     )
 
     repo = ReportRepository(state_dir)
