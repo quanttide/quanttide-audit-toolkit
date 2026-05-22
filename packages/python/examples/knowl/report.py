@@ -13,34 +13,15 @@ def render_report(
     *,
     report: AuditReport,
     mode: str,
-    stats: tuple,
     diff: Optional[tuple] = None,
     previous_timestamp: Optional[str] = None,
 ) -> None:
-    _print_stats(stats)
     print("=" * 60)
     print("  检测结果")
     print("=" * 60)
     print()
     _print_diff(diff, previous_timestamp)
     _print_report_to_stdout(report, mode)
-
-
-def _print_stats(stats: tuple) -> None:
-    domains, ontology_count, instance_count = stats
-    print("=" * 60)
-    print("  知识库概览")
-    print("=" * 60)
-    print(f"\n  数据目录: —")
-    print(f"  领域数量: {len(domains)}")
-    print(f"  本体数量: {ontology_count}")
-    print(f"  实例数量: {instance_count}")
-    print()
-    if domains:
-        print("  领域清单:")
-        for domain in domains:
-            print(f"    {str(domain[0]):<20} {domain[1]:<12}")
-        print()
 
 
 def _print_diff(diff: Optional[tuple], previous_timestamp: Optional[str]) -> None:

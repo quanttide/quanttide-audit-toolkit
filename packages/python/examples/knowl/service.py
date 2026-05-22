@@ -1,16 +1,12 @@
 import re
 from uuid import uuid4
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from quanttide_audit import AuditCriteria, AuditFinding, AuditReport, AuditSeverity
 
-from .tools import all_detection_tools
 from .parser import ToolOutputParser
 from .report import render_report, ReportRepository
-from .config import settings
-from .loader import load_all_domains
 
 
 TS = "2026-01-01T00:00:00"
@@ -47,6 +43,17 @@ _TOOL_MAP = {
     "cross-domain-report": ("跨领域关系覆盖率", AuditSeverity.OBSERVATION),
 }
 
+_SAMPLE_OUTPUTS = {
+    "validate": (
+        "=== engineering ===\n[MISS] ontologies.json\n[FAIL] JSON 格式错误: instances.json 第 5 行缺少逗号\n"
+        "=== finance ===\n[MISS] domain.json\n"
+    ),
+    "find-undefined-terms": "=== engineering ===\n在 domain ontology 中使用了术语 深度学习\n在 domain ontology 中使用了术语 知识图谱\n",
+    "fusion-check": "=== finance ===\n【需人确认】引用不存在的实例 budget-2024\n",
+    "check-abstraction": "=== engineering ===\n[检测到] 具体值 MySQL 应抽象为变量\n",
+    "cross-domain-report": "=== engineering ===\n跨领域关系覆盖率: 65%\n=== finance ===\n跨领域关系覆盖率: 42%\n",
+}
+
 
 def _slug(text: str) -> str:
     s = re.sub(r"[^\w\s-]", "", text.lower()).strip()
@@ -72,67 +79,26 @@ def _finding_key(f: AuditFinding) -> str:
     return f"{f.severity.value}|{f.criterion.name}|{f.title}|{f.description or ''}"
 
 
-def _collect_stats(ddir):
-    domains = []
-    ontology_count = 0
-    instance_count = 0
-    try:
-        for d, domain, ontologies, instances in load_all_domains(ddir):
-            domains.append(domain)
-            ontology_count += len(ontologies)
-            instance_count += len(instances)
-    except Exception:
-        pass
-    return (domains, ontology_count, instance_count)
+def run(mode: str = "full") -> int:
+    if mode not in ("simple", "full"):
+        print(f"不支持的审计模式 '{mode}'，仅支持 simple / full")
+        return 1
 
-
-def _run_tools(ddir, mode):
     parser = ToolOutputParser()
-    tools = all_detection_tools(mode)
     findings = []
-    for tool in tools:
-        inp = {"data_dir": str(ddir)}
-        output = tool.execute(inp)
-        raw = parser.parse(output, str(ddir))
-        if not raw and parser.has_issue(output):
-            raw = [{"label": "检测到异常但无法解析具体位置", "action": "请查看上方原始日志确认问题"}]
-        entry = _TOOL_MAP.get(tool.name)
-        if not entry:
-            continue
-        group, severity = entry
+    for tool_name, sample in _SAMPLE_OUTPUTS.items():
+        raw = parser.parse(sample)
+        group, severity = _TOOL_MAP[tool_name]
         for issue in raw:
             findings.append(_to_finding(issue["label"], issue["action"], group, severity))
-    return findings
-
-
-def _validate_args(ddir):
-    if not ddir.exists():
-        print("审计中止：数据目录不存在")
-        print(f"  当前路径: {ddir}")
-        print("请确认 QTCLOUD_KNOWL_DATA_HOME 环境变量已正确设置，或传入 data_dir 参数。")
-        return False
-    return True
-
-
-def run(data_dir: Optional[str] = None, mode: str = "full") -> int:
-    if mode not in ("simple", "full"):
-        print(f"错误: 不支持的审计模式 '{mode}'，仅支持 simple / full")
-        return 1
-
-    ddir = Path(data_dir) if data_dir else settings.data_home
-    if not _validate_args(ddir):
-        return 1
-
-    stats = _collect_stats(ddir)
-    findings = _run_tools(ddir, mode)
 
     audit_report = AuditReport(
-        id=uuid4(), name=f"knowl-audit-{datetime.now().isoformat()[:10]}", title="知识库审计报告",
+        id=uuid4(), name="knowl-audit-demo", title="知识库审计示例",
         findings=findings,
         created_at=TS, updated_at=TS,
     )
 
-    repo = ReportRepository(settings.state_home)
+    repo = ReportRepository(Path.home() / ".quanttide" / "audit")
     previous = repo.load_previous_state(mode=mode)
     diff = None
     prev_ts = None
@@ -141,9 +107,8 @@ def run(data_dir: Optional[str] = None, mode: str = "full") -> int:
         prev_keys = frozenset(f.finding_key() for f in prev_findings)
         curr_keys = frozenset(_finding_key(f) for f in findings)
         diff = (prev_keys - curr_keys, curr_keys - prev_keys, prev_keys & curr_keys)
-        prev_ts = prev_ts
 
     repo.save_report(audit_report, mode)
-    render_report(report=audit_report, mode=mode, stats=stats, diff=diff, previous_timestamp=prev_ts)
+    render_report(report=audit_report, mode=mode, diff=diff, previous_timestamp=prev_ts)
     has_problems = any(f.severity in (AuditSeverity.MAJOR, AuditSeverity.MINOR) for f in findings)
     return 0 if not has_problems else 1
