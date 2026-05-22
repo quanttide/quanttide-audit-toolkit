@@ -1,9 +1,10 @@
+import re
 from uuid import uuid4
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from quanttide_audit import AuditReport
+from quanttide_audit import AuditCriteria, AuditFinding, AuditReport, AuditSeverity
 
 from .tools import all_detection_tools
 from .models import AuditIssues, AuditIssue, AuditMode, KnowledgeBaseStats
@@ -17,17 +18,51 @@ from .loader import load_all_domains
 TS = "2026-01-01T00:00:00"
 
 
-def _to_finding(issue: AuditIssue):
-    from quanttide_audit import AuditEvidence, AuditFinding, AuditSeverity, AuditCriteria
+_CRITERIA = {
+    "文件结构问题": AuditCriteria(
+        id=uuid4(), name="file-structure", title="文件结构检查",
+        description="检查知识库文件结构是否完整", created_at=TS, updated_at=TS,
+    ),
+    "未定义术语": AuditCriteria(
+        id=uuid4(), name="undefined-terms", title="未定义术语检查",
+        description="检测领域本体中使用了未在 vocabulary 中定义的术语", created_at=TS, updated_at=TS,
+    ),
+    "名称冲突或引用断裂": AuditCriteria(
+        id=uuid4(), name="name-conflict", title="名称冲突与引用断裂检查",
+        description="检测领域间名称冲突和悬挂引用", created_at=TS, updated_at=TS,
+    ),
+    "本体抽象度不足": AuditCriteria(
+        id=uuid4(), name="abstraction-level", title="本体抽象度检查",
+        description="检测具体值应抽象为变量的情况", created_at=TS, updated_at=TS,
+    ),
+    "跨领域关系覆盖率": AuditCriteria(
+        id=uuid4(), name="cross-domain-coverage", title="跨领域关系覆盖率",
+        description="检测跨领域关系的覆盖程度", created_at=TS, updated_at=TS,
+    ),
+}
 
-    sev_map = {"need_confirm": AuditSeverity.MAJOR, "auto_fixable": AuditSeverity.MINOR, "suggestions": AuditSeverity.OBSERVATION}
+_SEVERITY_MAP = {
+    "need_confirm": AuditSeverity.MAJOR,
+    "auto_fixable": AuditSeverity.MINOR,
+    "suggestions": AuditSeverity.OBSERVATION,
+}
+
+
+def _slug(text: str) -> str:
+    s = re.sub(r"[^\w\s-]", "", text.lower()).strip()
+    s = re.sub(r"[\s_]+", "-", s)
+    return s[:48]
+
+
+def _to_finding(issue: AuditIssue, idx: int = 0) -> AuditFinding:
+    criterion = _CRITERIA[issue.group]
     return AuditFinding(
         id=uuid4(),
-        name=issue.group,
+        name=f"{criterion.name}-{_slug(issue.label)[:40] or idx}",
         title=issue.label,
-        criterion=AuditCriteria(id=uuid4(), name=issue.group, title=issue.group, description=issue.group, created_at=TS, updated_at=TS),
-        evidence=[AuditEvidence(id=uuid4(), name=f"ev-{issue.group}", title=issue.label, description=issue.action, created_at=TS, updated_at=TS)],
-        severity=sev_map.get(issue.category, AuditSeverity.OBSERVATION),
+        criterion=criterion,
+        evidence=[],
+        severity=_SEVERITY_MAP.get(issue.category, AuditSeverity.OBSERVATION),
         description=issue.action or None,
         created_at=TS,
         updated_at=TS,
@@ -120,7 +155,7 @@ def run(data_dir: Optional[str] = None, mode: str = "full") -> int:
 
     audit_report = AuditReport(
         id=uuid4(), name=f"knowl-audit-{datetime.now().isoformat()[:10]}", title="知识库审计报告",
-        findings=[_to_finding(i) for i in all_raw],
+        findings=[_to_finding(i, idx) for idx, i in enumerate(all_raw)],
         created_at=TS, updated_at=TS,
     )
 
