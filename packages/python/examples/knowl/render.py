@@ -32,11 +32,13 @@ DEFAULT_REPORT_TEMPLATE = {
 }
 
 
-def _group_issues(findings):
-    groups = {}
+def _print_report_to_stdout(report: AuditReport, mode: str, template=None) -> None:
+    print(f"  {title}")
     for f in findings:
-        groups.setdefault(f.criterion.name, []).append(f)
-    return list(groups.items())
+        print(f"    {f.title}")
+        if f.description:
+            print(f"    → {f.description}")
+    print()
 
 
 def _print_group(title: str, findings: list) -> None:
@@ -85,7 +87,10 @@ def _print_report_to_stdout(report: AuditReport, mode: str, template=None) -> No
     if has_problems:
         for sev_key, header, desc in sections:
             source = {"major": major, "minor": minor}.get(sev_key, [])
-            groups = _group_issues(source) if source else []
+            groups = {}
+            for f in source:
+                groups.setdefault(f.criterion.name, []).append(f)
+            groups = list(groups.items())
             if groups:
                 _print_section(header, desc, groups)
 
@@ -101,10 +106,13 @@ def _print_report_to_stdout(report: AuditReport, mode: str, template=None) -> No
             print(tail)
 
     if obs:
+        _groups = {}
+        for f in obs:
+            _groups.setdefault(f.criterion.name, []).append(f)
         _print_section(
             "建议关注",
             "以下优化建议在全面审计模式下提供。" if mode == "full" else "以下问题在快速模式下仅供参考，切换到 --mode full 进行全面审计。",
-            _group_issues(obs),
+            list(_groups.items()),
         )
 
     if not has_problems and not obs:
