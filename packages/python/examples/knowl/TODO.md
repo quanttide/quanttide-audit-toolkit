@@ -1,3 +1,7 @@
-- [ ] **`_FindingProxy` → 内联** — 为 4 字段传递造类，`load_previous_state` 直接算 key
-- [ ] **`_SAMPLE_OUTPUTS` + `parser.parse()` 管道 → 直出 `AuditFinding`** — 字符串→dict→finding 绕远了，demo 层直接构造 finding
-- [ ] **`_CRITERIA` 的 `uuid4()` 模块级执行** — 每次进程启动 UUID 随机，对 diff 持久化有干扰。改用固定 UUID 或 lazy init
+`examples/knowl/` 73 tests ✅
+
+清理完成：
+- ~~`_FindingProxy` → 内联算 key~~ ✅
+- ~~`_SAMPLE_OUTPUTS` + `parser.parse()` → 直出 `AuditFinding`~~ ✅ (`_FINDING_DEFS` → tests)
+- ~~`_CRITERIA` uuid4() → 固定 UUID~~ ✅
+- ~~假数据移到测试~~ ✅
