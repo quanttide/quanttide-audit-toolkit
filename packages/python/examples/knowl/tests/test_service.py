@@ -74,14 +74,14 @@ def _make_findings():
 
 
 class TestRun:
-    def test_full_mode(self, tmp_path):
-        assert run(_make_findings(), mode="full", state_dir=tmp_path) == 1
+    def test_full_mode(self):
+        assert run(_make_findings(), mode="full") == 1
 
-    def test_simple_mode(self, tmp_path):
-        assert run(_make_findings(), mode="simple", state_dir=tmp_path) == 1
+    def test_simple_mode(self):
+        assert run(_make_findings(), mode="simple") == 1
 
-    def test_invalid_mode(self, tmp_path):
-        assert run([], mode="unknown", state_dir=tmp_path) == 1
+    def test_invalid_mode(self):
+        assert run([], mode="unknown") == 1
 
-    def test_clean_report(self, tmp_path):
-        assert run([], mode="full", state_dir=tmp_path) == 0
+    def test_clean_report(self):
+        assert run([], mode="full") == 0

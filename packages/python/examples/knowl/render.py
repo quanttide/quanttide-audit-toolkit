@@ -1,5 +1,3 @@
-from typing import Optional
-
 from quanttide_audit import AuditReport, AuditSeverity
 
 
@@ -7,34 +5,12 @@ def render_report(
     *,
     report: AuditReport,
     mode: str,
-    diff: Optional[tuple] = None,
-    previous_timestamp: Optional[str] = None,
 ) -> None:
     print("=" * 60)
     print("  检测结果")
     print("=" * 60)
     print()
-    _print_diff(diff, previous_timestamp)
     _print_report_to_stdout(report, mode)
-
-
-def _print_diff(diff: Optional[tuple], previous_timestamp: Optional[str]) -> None:
-    if not diff:
-        return
-    fixed, new, pending = diff
-    prev_time = (previous_timestamp or "未知")[:10]
-    if fixed or new or pending:
-        parts = []
-        if fixed:
-            parts.append(f"✅ 已修复 {len(fixed)} 项")
-        if new:
-            parts.append(f"🆕 新增 {len(new)} 项")
-        if pending:
-            parts.append(f"⏳ 待处理 {len(pending)} 项")
-        print(f"相比上次审计（{prev_time}）：{' / '.join(parts)}")
-    else:
-        print(f"✓ 与上次审计一致，无新增问题（{prev_time}）")
-    print()
 
 
 DEFAULT_REPORT_TEMPLATE = {
