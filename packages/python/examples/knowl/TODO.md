@@ -1,9 +1,3 @@
-# examples/knowl
-
-所有中间商已清除。工具包模型直出直用。
-
-- `models.py` — 删除（含 AuditIssue, AuditIssues, AuditDiff, KnowledgeBaseStats, AuditMode）
-- `parser.py` — 直出 `list[dict]`
-- `service.py` — 直出 `list[AuditFinding]`
-- `report.py` — 只接 `AuditReport` + 元组
-- 测试 90 通过，端到端 full/simple 正常
+- [ ] **`_FindingProxy` → 内联** — 为 4 字段传递造类，`load_previous_state` 直接算 key
+- [ ] **`_SAMPLE_OUTPUTS` + `parser.parse()` 管道 → 直出 `AuditFinding`** — 字符串→dict→finding 绕远了，demo 层直接构造 finding
+- [ ] **`_CRITERIA` 的 `uuid4()` 模块级执行** — 每次进程启动 UUID 随机，对 diff 持久化有干扰。改用固定 UUID 或 lazy init

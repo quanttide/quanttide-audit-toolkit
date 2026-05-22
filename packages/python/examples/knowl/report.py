@@ -59,11 +59,11 @@ class ReportRepository:
             data = json.loads(self._path.read_text(encoding="utf-8"))
             if mode and data.get("mode") != mode:
                 return None
-            findings = [
-                _FindingProxy(sev=s["severity"], crit=s["criterion"], title=s["title"], desc=s.get("description", ""))
+            keys = frozenset(
+                f"{s['severity']}|{s['criterion']}|{s['title']}|{s.get('description', '')}"
                 for s in data.get("findings", [])
-            ]
-            return (findings, data.get("timestamp", ""))
+            )
+            return (keys, data.get("timestamp", ""))
         except Exception:
             return None
 
@@ -78,18 +78,6 @@ class ReportRepository:
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-class _FindingProxy:
-    def __init__(self, sev, crit, title, desc):
-        self.severity_value = sev
-        self.criterion_name = crit
-        self.title = title
-        self.description = desc
-
-    def finding_key(self) -> str:
-        return f"{self.severity_value}|{self.criterion_name}|{self.title}|{self.description}"
-
 
 # ── rendering helpers ───────────────────────────────────────────────────────
 
