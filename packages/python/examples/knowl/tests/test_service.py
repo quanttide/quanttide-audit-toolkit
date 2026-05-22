@@ -1,8 +1,42 @@
-from quanttide_audit import AuditSeverity
+import re
+from uuid import uuid4
 
-from examples.knowl.service import run, _to_finding
+from quanttide_audit import AuditCriteria, AuditFinding, AuditSeverity
 
-_SAMPLE_FINDINGS = [
+from examples.knowl.service import TS, run
+
+_CRITERIA_UUIDS = {
+    "file-structure": "11111111-1111-1111-1111-111111111111",
+    "undefined-terms": "22222222-2222-2222-2222-222222222222",
+    "name-conflict": "33333333-3333-3333-3333-333333333333",
+    "abstraction-level": "44444444-4444-4444-4444-444444444444",
+    "cross-domain-coverage": "55555555-5555-5555-5555-555555555555",
+}
+
+_CRITERIA = {
+    "文件结构问题": AuditCriteria(
+        id=_CRITERIA_UUIDS["file-structure"], name="file-structure", title="文件结构检查",
+        description="检查知识库文件结构是否完整", created_at=TS, updated_at=TS,
+    ),
+    "未定义术语": AuditCriteria(
+        id=_CRITERIA_UUIDS["undefined-terms"], name="undefined-terms", title="未定义术语检查",
+        description="检测领域本体中使用了未在 vocabulary 中定义的术语", created_at=TS, updated_at=TS,
+    ),
+    "名称冲突或引用断裂": AuditCriteria(
+        id=_CRITERIA_UUIDS["name-conflict"], name="name-conflict", title="名称冲突与引用断裂检查",
+        description="检测领域间名称冲突和悬挂引用", created_at=TS, updated_at=TS,
+    ),
+    "本体抽象度不足": AuditCriteria(
+        id=_CRITERIA_UUIDS["abstraction-level"], name="abstraction-level", title="本体抽象度检查",
+        description="检测具体值应抽象为变量的情况", created_at=TS, updated_at=TS,
+    ),
+    "跨领域关系覆盖率": AuditCriteria(
+        id=_CRITERIA_UUIDS["cross-domain-coverage"], name="cross-domain-coverage", title="跨领域关系覆盖率",
+        description="检测跨领域关系的覆盖程度", created_at=TS, updated_at=TS,
+    ),
+}
+
+_SAMPLE_DEFS = [
     ("• 缺少文件 ontologies.json", "运行 auto-fix 自动补全缺失文件", "文件结构问题", AuditSeverity.MINOR),
     ("• JSON 格式错误: instances.json 第 5 行缺少逗号", "修复对应 JSON 文件格式", "文件结构问题", AuditSeverity.MINOR),
     ("• 缺少文件 domain.json", "运行 auto-fix 自动补全缺失文件", "文件结构问题", AuditSeverity.MINOR),
@@ -13,23 +47,39 @@ _SAMPLE_FINDINGS = [
 ]
 
 
+def _slug(text):
+    s = re.sub(r"[^\w\s-]", "", text.lower()).strip()
+    return re.sub(r"[\s_]+", "-", s)[:48]
+
+
+def _to_finding(label, action, group, severity):
+    criterion = _CRITERIA[group]
+    return AuditFinding(
+        id=uuid4(),
+        name=f"{criterion.name}-{_slug(label)[:40]}",
+        title=label,
+        criterion=criterion,
+        evidence=[],
+        severity=severity,
+        description=action or None,
+        created_at=TS,
+        updated_at=TS,
+    )
+
+
 def _make_findings():
-    return [_to_finding(label, action, group, sev) for label, action, group, sev in _SAMPLE_FINDINGS]
+    return [_to_finding(*d) for d in _SAMPLE_DEFS]
 
 
 class TestRun:
     def test_full_mode(self, tmp_path):
-        code = run(_make_findings(), mode="full", state_dir=tmp_path)
-        assert code == 1
+        assert run(_make_findings(), mode="full", state_dir=tmp_path) == 1
 
     def test_simple_mode(self, tmp_path):
-        code = run(_make_findings(), mode="simple", state_dir=tmp_path)
-        assert code == 1
+        assert run(_make_findings(), mode="simple", state_dir=tmp_path) == 1
 
     def test_invalid_mode(self, tmp_path):
-        code = run([], mode="unknown", state_dir=tmp_path)
-        assert code == 1
+        assert run([], mode="unknown", state_dir=tmp_path) == 1
 
     def test_clean_report(self, tmp_path):
-        code = run([], mode="full", state_dir=tmp_path)
-        assert code == 0
+        assert run([], mode="full", state_dir=tmp_path) == 0
