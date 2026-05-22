@@ -1,32 +1,35 @@
 name: publish-python
+
 on:
   release:
     types: [published]
+
 jobs:
   publish:
     if: startsWith(github.ref, 'refs/tags/python/')
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/python
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: install uv
-        run: pip install uv
       - name: check version consistency
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#python/v}"
-          PKG_VERSION=$(grep '^version = ' packages/python/pyproject.toml | cut -d'"' -f2)
+          PKG_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
             echo "Tag version ($TAG_VERSION) != pyproject.toml version ($PKG_VERSION)"
             exit 1
           fi
           echo "Version consistent: $PKG_VERSION"
+      - name: install uv
+        run: pip install uv
       - name: build
         run: uv build
-        working-directory: packages/python
       - name: publish
         run: uv publish
-        working-directory: packages/python
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
