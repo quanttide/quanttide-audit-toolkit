@@ -16,11 +16,13 @@ class TestLoadAllDomains:
         assert isinstance(path, Path)
         assert str(path).startswith("/base")
 
-    def test_domain_has_id_and_name(self):
+    def test_domain_is_tuple_with_id_and_name(self):
         results = list(load_all_domains(Path("/data")))
         for _, domain, _, _ in results:
-            assert hasattr(domain, "id")
-            assert hasattr(domain, "name")
+            assert isinstance(domain, tuple)
+            assert len(domain) == 2
+            assert isinstance(domain[0], str)
+            assert isinstance(domain[1], str)
 
     def test_ontologies_and_instances_are_lists(self):
         results = list(load_all_domains(Path("/data")))

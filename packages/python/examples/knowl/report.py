@@ -39,7 +39,7 @@ def _print_stats(stats: tuple) -> None:
     if domains:
         print("  领域清单:")
         for domain in domains:
-            print(f"    {str(domain.id):<20} {domain.name:<12}")
+            print(f"    {str(domain[0]):<20} {domain[1]:<12}")
         print()
 
 
