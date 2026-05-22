@@ -1,7 +1,7 @@
 import re
 from uuid import uuid4
 
-from quanttide_audit import AuditCriteria, AuditFinding, AuditSeverity
+from quanttide_audit import AuditFinding, AuditReport, AuditSeverity, AuditCriteria
 
 from examples.knowl.service import run
 
@@ -75,13 +75,22 @@ def _make_findings():
 
 class TestRun:
     def test_full_mode(self):
-        assert run(_make_findings(), mode="full") == 1
+        report = run(_make_findings(), mode="full")
+        assert isinstance(report, AuditReport)
 
     def test_simple_mode(self):
-        assert run(_make_findings(), mode="simple") == 1
+        report = run(_make_findings(), mode="simple")
+        assert isinstance(report, AuditReport)
 
     def test_invalid_mode(self):
-        assert run([], mode="unknown") == 1
+        import pytest
+        with pytest.raises(ValueError):
+            run([], mode="unknown")
 
     def test_clean_report(self):
-        assert run([], mode="full") == 0
+        report = run([], mode="full")
+        assert report.findings == []
+
+    def test_findings_present(self):
+        report = run(_make_findings(), mode="full")
+        assert len(report.findings) == 7
