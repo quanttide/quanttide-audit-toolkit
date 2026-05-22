@@ -64,12 +64,14 @@ class TestAuditDiff:
         curr = []
         assert AuditDiff.compute(prev, curr).has_changes is True
 
-    def test_pending_only_means_no_fixed_or_new(self):
+    def test_pending_only_means_no_changes(self):
         shared = [AuditIssue(category="c", group="g", label="x")]
         diff = AuditDiff.compute(shared, shared)
         assert diff.fixed == frozenset()
         assert diff.new == frozenset()
         assert len(diff.pending) == 1
+        assert diff.has_changes is False
+        assert diff.is_identical is True
 
     def test_no_previous_timestamp(self):
         diff = AuditDiff.compute([], [])

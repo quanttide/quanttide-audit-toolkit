@@ -7,9 +7,8 @@ from typing import Optional
 from quanttide_audit import AuditCriteria, AuditFinding, AuditReport, AuditSeverity
 
 from .tools import all_detection_tools
-from .models import AuditIssues, AuditIssue, AuditMode, KnowledgeBaseStats
+from .models import AuditDiff as _AuditDiff, AuditIssues, AuditIssue, AuditMode, KnowledgeBaseStats
 from .parser import ToolOutputParser
-from .models import AuditDiff as _AuditDiff
 from .report import render_report, ReportRepository
 from .config import settings
 from .loader import load_all_domains

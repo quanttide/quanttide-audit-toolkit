@@ -115,16 +115,9 @@ class _PreviousAudit:
 # ── rendering helpers ───────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
-class ReportSectionDef:
-    key: str
-    header: str
-    description: str
-
-
-@dataclass(frozen=True)
 class ReportTemplate:
-    sections_full: list
-    sections_simple: list
+    sections_full: list[tuple]
+    sections_simple: list[tuple]
     clean_message: str
     summary_header: str
     tail_messages: dict
@@ -144,12 +137,12 @@ class ReportTemplate:
 
 DEFAULT_REPORT_TEMPLATE = ReportTemplate(
     sections_full=[
-        ReportSectionDef("need_confirm", "需要你确认的问题", "以下问题平台无法自动判断，需要你决定如何处理。"),
-        ReportSectionDef("auto_fixable", "平台发现的问题", "以下问题平台已识别，可通过自动修复处理。"),
+        ("need_confirm", "需要你确认的问题", "以下问题平台无法自动判断，需要你决定如何处理。"),
+        ("auto_fixable", "平台发现的问题", "以下问题平台已识别，可通过自动修复处理。"),
     ],
     sections_simple=[
-        ReportSectionDef("need_confirm", "建议关注", "以下问题可由平台自动修复，无需手动处理。"),
-        ReportSectionDef("auto_fixable", "平台发现的问题", "以下问题平台已识别，可通过自动修复处理。"),
+        ("need_confirm", "建议关注", "以下问题可由平台自动修复，无需手动处理。"),
+        ("auto_fixable", "平台发现的问题", "以下问题平台已识别，可通过自动修复处理。"),
     ],
     clean_message="✓ 未发现问题，知识库结构良好。",
     summary_header="  汇总",
@@ -186,9 +179,10 @@ def _print_report_to_stdout(issues: AuditIssues, template=None) -> None:
 
     if has_problems:
         for section in sections:
-            groups = issues.section_groups(section.key)
+            key, header, description = section
+            groups = issues.section_groups(key)
             if groups:
-                _print_section(section.header, section.description, groups)
+                _print_section(header, description, groups)
 
         print("=" * 60)
         print(template.summary_header)

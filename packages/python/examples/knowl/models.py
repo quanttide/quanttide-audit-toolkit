@@ -49,7 +49,7 @@ class AuditDiff:
 
     @property
     def has_changes(self) -> bool:
-        return bool(self.fixed or self.new or self.pending)
+        return bool(self.fixed or self.new)
 
     @property
     def is_identical(self) -> bool:
