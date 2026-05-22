@@ -1,8 +1,6 @@
 import re
 from typing import Optional
 
-from .models import AuditIssue
-
 MISS_TAG = "[MISS] "
 FAIL_TAG = "[FAIL] "
 DETECTED_TAG = "[检测到] "
@@ -20,7 +18,7 @@ def _parse_miss(line, current_domain, data_dir):
         action = f"运行 qtcloud-knowl auto-fix 自动补全，或创建文件 {data_dir}/{current_domain}/{fname}"
     else:
         action = "运行 qtcloud-knowl auto-fix 自动补全缺失文件"
-    return AuditIssue(category="auto_fixable", group="文件结构问题", label=label, action=action)
+    return {"label": label, "action": action}
 
 
 def _parse_fail(line, current_domain, data_dir):
@@ -33,7 +31,7 @@ def _parse_fail(line, current_domain, data_dir):
         if current_domain
         else "修复对应 JSON 文件格式"
     )
-    return AuditIssue(category="auto_fixable", group="文件结构问题", label=label, action=action)
+    return {"label": label, "action": action}
 
 
 def _parse_term(line, _current_domain=None, _data_dir=None):
@@ -41,7 +39,7 @@ def _parse_term(line, _current_domain=None, _data_dir=None):
         return None
     label = f"• {line}"
     action = "在对应领域 domain.json 的 vocabulary 字段中补充该术语"
-    return AuditIssue(category="need_confirm", group="未定义术语", label=label, action=action)
+    return {"label": label, "action": action}
 
 
 def _parse_confirm(line, _current_domain=None, _data_dir=None):
@@ -49,20 +47,21 @@ def _parse_confirm(line, _current_domain=None, _data_dir=None):
         return None
     label = line.replace(f"【{NEED_CONFIRM_TAG}】", "").strip()
     action = "确认该引用是否必要，如必要则补充源文件或删除引用"
-    return AuditIssue(category="need_confirm", group="名称冲突或引用断裂", label=f"• {label}", action=action)
+    return {"label": f"• {label}", "action": action}
 
 
 def _parse_abstraction(line, current_domain, data_dir):
     if DETECTED_TAG not in line:
         return None
-    label = line.split(DETECTED_TAG, 1)[-1].strip()
+    msg = line.split(DETECTED_TAG, 1)[-1].strip()
+    label = f"• {msg}"
     dest = (
         f"{data_dir}/{current_domain}/ontologies.json"
         if current_domain
         else "对应 ontologies.json"
     )
     action = f"重构 {dest} 中的 pattern，将具体值改为变量"
-    return AuditIssue(category="suggestions", group="本体抽象度不足", label=f"• {label}", action=action)
+    return {"label": label, "action": action}
 
 
 _PARSERS = [

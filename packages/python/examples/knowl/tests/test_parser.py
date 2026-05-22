@@ -19,45 +19,37 @@ class TestToolOutputParser:
         p = self.make_parser()
         issues = p.parse("[MISS] missing.csv")
         assert len(issues) == 1
-        assert issues[0].category == "auto_fixable"
-        assert issues[0].group == "文件结构问题"
-        assert "缺少文件" in issues[0].label
+        assert "缺少文件" in issues[0]["label"]
 
     def test_parse_miss_with_domain(self):
         p = self.make_parser()
         issues = p.parse("=== eng ===\n[MISS] missing.csv", "/data")
         assert len(issues) == 1
-        assert "/data/eng/missing.csv" in issues[0].action
+        assert "/data/eng/missing.csv" in issues[0]["action"]
 
     def test_parse_fail(self):
         p = self.make_parser()
         issues = p.parse("[FAIL] syntax error")
         assert len(issues) == 1
-        assert issues[0].category == "auto_fixable"
-        assert "JSON 格式错误" in issues[0].label
-        assert "syntax error" in issues[0].label
+        assert "JSON 格式错误" in issues[0]["label"]
+        assert "syntax error" in issues[0]["label"]
 
     def test_parse_term(self):
         p = self.make_parser()
         issues = p.parse("在文件中使用了术语 机器学习")
         assert len(issues) == 1
-        assert issues[0].category == "need_confirm"
-        assert issues[0].group == "未定义术语"
+        assert "术语" in issues[0]["label"]
 
     def test_parse_confirm(self):
         p = self.make_parser()
         issues = p.parse("【需人确认】引用不存在的实体 X")
         assert len(issues) == 1
-        assert issues[0].category == "need_confirm"
-        assert issues[0].group == "名称冲突或引用断裂"
 
     def test_parse_abstraction(self):
         p = self.make_parser()
         issues = p.parse("[检测到] 具体值 42 应抽象为变量")
         assert len(issues) == 1
-        assert issues[0].category == "suggestions"
-        assert issues[0].group == "本体抽象度不足"
-        assert "42" in issues[0].label
+        assert "42" in issues[0]["label"]
 
     def test_parse_multiple_issues(self):
         p = self.make_parser()
@@ -81,7 +73,7 @@ class TestToolOutputParser:
         line = "[MISS] x [FAIL] y"
         issues = p.parse(line)
         assert len(issues) == 1
-        assert "缺少文件" in issues[0].label
+        assert "缺少文件" in issues[0]["label"]
 
     def test_has_issue_miss(self):
         p = self.make_parser()

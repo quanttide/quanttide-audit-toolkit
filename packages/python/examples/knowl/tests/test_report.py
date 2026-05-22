@@ -1,14 +1,6 @@
 from pathlib import Path
 
-from examples.knowl.models import AuditIssue, AuditIssues, AuditMode
 from examples.knowl.report import DEFAULT_REPORT_TEMPLATE, ReportRepository
-
-
-def _make_issues(**kw):
-    nc = [AuditIssue(category="need_confirm", group="g", label="x")]
-    data = dict(mode=AuditMode.FULL, need_confirm=nc, auto_fixable=[], suggestions=[])
-    data.update(kw)
-    return AuditIssues.from_raw(**data)
 
 
 class TestReportRepository:
@@ -17,20 +9,18 @@ class TestReportRepository:
         assert repo.load_previous_state() is None
 
     def test_save_then_load(self, tmp_path):
-        issues = _make_issues()
-        repo = ReportRepository(tmp_path)
         report = _dummy_audit_report()
-        repo.save_report(report, issues)
+        repo = ReportRepository(tmp_path)
+        repo.save_report(report, "full")
 
         loaded = repo.load_previous_state()
         assert loaded is not None
-        assert loaded[2] == AuditMode.FULL
+        assert loaded[1] is not None
 
     def test_load_with_mode_mismatch(self, tmp_path):
-        issues = _make_issues(mode=AuditMode.SIMPLE)
         repo = ReportRepository(tmp_path)
-        repo.save_report(_dummy_audit_report(), issues)
-        assert repo.load_previous_state(mode=AuditMode.FULL) is None
+        repo.save_report(_dummy_audit_report(), "simple")
+        assert repo.load_previous_state(mode="full") is None
 
     def test_load_corrupted_file(self, tmp_path):
         repo = ReportRepository(tmp_path)
@@ -49,12 +39,12 @@ class TestReportTemplate:
         t = DEFAULT_REPORT_TEMPLATE["tail_messages"]["simple"]
         assert "快速检查模式" in t
 
-    def test_tail_message_need_confirm(self):
-        t = DEFAULT_REPORT_TEMPLATE["tail_messages"]["need_confirm"]
+    def test_tail_message_major(self):
+        t = DEFAULT_REPORT_TEMPLATE["tail_messages"]["major"]
         assert "需要你确认" in t
 
-    def test_tail_message_auto_fixable(self):
-        t = DEFAULT_REPORT_TEMPLATE["tail_messages"]["auto_fixable"]
+    def test_tail_message_minor(self):
+        t = DEFAULT_REPORT_TEMPLATE["tail_messages"]["minor"]
         assert "自动修复" in t
 
     def test_clean_message(self):

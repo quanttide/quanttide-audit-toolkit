@@ -1,13 +1,9 @@
-# examples/knowl 尚存问题
+# examples/knowl
 
-## 行为倒灌进模型
+所有中间商已清除。工具包模型直出直用。
 
-`AuditIssues` 的 `exit_code` / `is_clean` / `section_groups` 是渲染逻辑，不应放在数据类上。移到渲染函数中内联处理。
-
-## 为传递数据造类型
-
-`_PreviousAudit` 和 `IssueGroup` 只是 2-3 字段的聚合，应该用元组或直接拆开传，不需要声明类。
-
-## 把配置声明成框架
-
-`ReportTemplate` + 方法 `sections_for()` / `tail_for()` 过度设计。用 plain dict + 内联逻辑即可。
+- `models.py` — 删除（含 AuditIssue, AuditIssues, AuditDiff, KnowledgeBaseStats, AuditMode）
+- `parser.py` — 直出 `list[dict]`
+- `service.py` — 直出 `list[AuditFinding]`
+- `report.py` — 只接 `AuditReport` + 元组
+- 测试 90 通过，端到端 full/simple 正常

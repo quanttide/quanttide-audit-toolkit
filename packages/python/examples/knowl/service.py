@@ -7,7 +7,6 @@ from typing import Optional
 from quanttide_audit import AuditCriteria, AuditFinding, AuditReport, AuditSeverity
 
 from .tools import all_detection_tools
-from .models import AuditDiff as _AuditDiff, AuditIssues, AuditIssue, AuditMode, KnowledgeBaseStats
 from .parser import ToolOutputParser
 from .report import render_report, ReportRepository
 from .config import settings
@@ -40,32 +39,37 @@ _CRITERIA = {
     ),
 }
 
-_SEVERITY_MAP = {
-    "need_confirm": AuditSeverity.MAJOR,
-    "auto_fixable": AuditSeverity.MINOR,
-    "suggestions": AuditSeverity.OBSERVATION,
+_TOOL_MAP = {
+    "validate": ("文件结构问题", AuditSeverity.MINOR),
+    "find-undefined-terms": ("未定义术语", AuditSeverity.MAJOR),
+    "fusion-check": ("名称冲突或引用断裂", AuditSeverity.MAJOR),
+    "check-abstraction": ("本体抽象度不足", AuditSeverity.OBSERVATION),
+    "cross-domain-report": ("跨领域关系覆盖率", AuditSeverity.OBSERVATION),
 }
 
 
 def _slug(text: str) -> str:
     s = re.sub(r"[^\w\s-]", "", text.lower()).strip()
-    s = re.sub(r"[\s_]+", "-", s)
-    return s[:48]
+    return re.sub(r"[\s_]+", "-", s)[:48]
 
 
-def _to_finding(issue: AuditIssue, idx: int = 0) -> AuditFinding:
-    criterion = _CRITERIA[issue.group]
+def _to_finding(label: str, action: str, group: str, severity: AuditSeverity) -> AuditFinding:
+    criterion = _CRITERIA[group]
     return AuditFinding(
         id=uuid4(),
-        name=f"{criterion.name}-{_slug(issue.label)[:40] or idx}",
-        title=issue.label,
+        name=f"{criterion.name}-{_slug(label)[:40]}",
+        title=label,
         criterion=criterion,
         evidence=[],
-        severity=_SEVERITY_MAP.get(issue.category, AuditSeverity.OBSERVATION),
-        description=issue.action or None,
+        severity=severity,
+        description=action or None,
         created_at=TS,
         updated_at=TS,
     )
+
+
+def _finding_key(f: AuditFinding) -> str:
+    return f"{f.severity.value}|{f.criterion.name}|{f.title}|{f.description or ''}"
 
 
 def _collect_stats(ddir):
@@ -79,55 +83,29 @@ def _collect_stats(ddir):
             instance_count += len(instances)
     except Exception:
         pass
-    return KnowledgeBaseStats(data_dir=ddir, domains=domains, ontology_count=ontology_count, instance_count=instance_count)
-
-
-def _categorize_issues(raw_issues, mode):
-    need_confirm = []
-    auto_fixable = []
-    suggestions = []
-    mapping = {
-        "validate": ("文件结构问题", "auto_fixable"),
-        "find-undefined-terms": ("未定义术语", "need_confirm"),
-        "fusion-check": ("名称冲突或引用断裂", "need_confirm"),
-        "check-abstraction": ("本体抽象度不足", "suggestions"),
-        "cross-domain-report": ("跨领域关系覆盖率", "suggestions"),
-    }
-    for tool_name, issues in raw_issues:
-        entry = mapping.get(tool_name)
-        if not entry or not issues:
-            continue
-        group, category = entry
-        target = {"need_confirm": need_confirm, "auto_fixable": auto_fixable, "suggestions": suggestions}
-        for issue in issues:
-            target[category].append(
-                AuditIssue(category=category, group=group, label=issue.label, action=issue.action)
-            )
-    return need_confirm, auto_fixable, suggestions
+    return (domains, ontology_count, instance_count)
 
 
 def _run_tools(ddir, mode):
     parser = ToolOutputParser()
-    tools = all_detection_tools(mode.value)
-    raw_issues = []
+    tools = all_detection_tools(mode)
+    findings = []
     for tool in tools:
         inp = {"data_dir": str(ddir)}
         output = tool.execute(inp)
-        issues = parser.parse(output, str(ddir))
-        if not issues and parser.has_issue(output):
-            issues.append(
-                AuditIssue(
-                    category="need_confirm",
-                    group=tool.name,
-                    label="检测到异常但无法解析具体位置",
-                    action="请查看上方原始日志确认问题",
-                )
-            )
-        raw_issues.append((tool.name, issues))
-    return _categorize_issues(raw_issues, mode)
+        raw = parser.parse(output, str(ddir))
+        if not raw and parser.has_issue(output):
+            raw = [{"label": "检测到异常但无法解析具体位置", "action": "请查看上方原始日志确认问题"}]
+        entry = _TOOL_MAP.get(tool.name)
+        if not entry:
+            continue
+        group, severity = entry
+        for issue in raw:
+            findings.append(_to_finding(issue["label"], issue["action"], group, severity))
+    return findings
 
 
-def _validate_args(ddir, mode):
+def _validate_args(ddir):
     if not ddir.exists():
         print("审计中止：数据目录不存在")
         print(f"  当前路径: {ddir}")
@@ -137,35 +115,35 @@ def _validate_args(ddir, mode):
 
 
 def run(data_dir: Optional[str] = None, mode: str = "full") -> int:
-    ddir = Path(data_dir) if data_dir else settings.data_home
-    try:
-        mode_vo = AuditMode(mode) if isinstance(mode, str) else mode
-    except ValueError:
+    if mode not in ("simple", "full"):
         print(f"错误: 不支持的审计模式 '{mode}'，仅支持 simple / full")
         return 1
 
-    if not _validate_args(ddir, mode_vo):
+    ddir = Path(data_dir) if data_dir else settings.data_home
+    if not _validate_args(ddir):
         return 1
 
     stats = _collect_stats(ddir)
-    need_confirm, auto_fixable, suggestions = _run_tools(ddir, mode_vo)
-    issues = AuditIssues.from_raw(need_confirm, auto_fixable, suggestions, mode_vo)
-    all_raw = need_confirm + auto_fixable + suggestions
+    findings = _run_tools(ddir, mode)
 
     audit_report = AuditReport(
         id=uuid4(), name=f"knowl-audit-{datetime.now().isoformat()[:10]}", title="知识库审计报告",
-        findings=[_to_finding(i, idx) for idx, i in enumerate(all_raw)],
+        findings=findings,
         created_at=TS, updated_at=TS,
     )
 
     repo = ReportRepository(settings.state_home)
-    previous = repo.load_previous_state(mode=mode_vo)
+    previous = repo.load_previous_state(mode=mode)
     diff = None
     prev_ts = None
     if previous:
-        prev_issues, prev_ts, _ = previous
-        diff = _AuditDiff.compute(prev_issues, all_raw, prev_ts)
+        prev_findings, prev_ts = previous
+        prev_keys = frozenset(f.finding_key() for f in prev_findings)
+        curr_keys = frozenset(_finding_key(f) for f in findings)
+        diff = (prev_keys - curr_keys, curr_keys - prev_keys, prev_keys & curr_keys)
+        prev_ts = prev_ts
 
-    repo.save_report(audit_report, issues)
-    render_report(report=audit_report, mode=mode_vo, stats=stats, issues=issues, diff=diff, previous_timestamp=prev_ts)
-    return 0 if not issues.need_confirm and not issues.auto_fixable else 1
+    repo.save_report(audit_report, mode)
+    render_report(report=audit_report, mode=mode, stats=stats, diff=diff, previous_timestamp=prev_ts)
+    has_problems = any(f.severity in (AuditSeverity.MAJOR, AuditSeverity.MINOR) for f in findings)
+    return 0 if not has_problems else 1
