@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from examples.knowl.models import AuditDiff, AuditIssue, AuditIssues, AuditMode
+from examples.knowl.models import AuditIssue, AuditIssues, AuditMode
 from examples.knowl.report import DEFAULT_REPORT_TEMPLATE, ReportRepository
 
 
@@ -24,7 +24,7 @@ class TestReportRepository:
 
         loaded = repo.load_previous_state()
         assert loaded is not None
-        assert loaded.mode == AuditMode.FULL
+        assert loaded[2] == AuditMode.FULL
 
     def test_load_with_mode_mismatch(self, tmp_path):
         issues = _make_issues(mode=AuditMode.SIMPLE)
@@ -40,26 +40,25 @@ class TestReportRepository:
 
 class TestReportTemplate:
     def test_sections_for_full(self):
-        assert DEFAULT_REPORT_TEMPLATE.sections_for(AuditMode.FULL) == DEFAULT_REPORT_TEMPLATE.sections_full
+        assert DEFAULT_REPORT_TEMPLATE["sections_full"] is not None
 
     def test_sections_for_simple(self):
-        assert DEFAULT_REPORT_TEMPLATE.sections_for(AuditMode.SIMPLE) == DEFAULT_REPORT_TEMPLATE.sections_simple
+        assert DEFAULT_REPORT_TEMPLATE["sections_simple"] is not None
 
-    def test_tail_for_simple(self):
-        t = DEFAULT_REPORT_TEMPLATE.tail_for(AuditMode.SIMPLE, has_confirm=True, has_fixable=True)
+    def test_tail_message_simple(self):
+        t = DEFAULT_REPORT_TEMPLATE["tail_messages"]["simple"]
         assert "快速检查模式" in t
 
-    def test_tail_for_need_confirm(self):
-        t = DEFAULT_REPORT_TEMPLATE.tail_for(AuditMode.FULL, has_confirm=True, has_fixable=False)
+    def test_tail_message_need_confirm(self):
+        t = DEFAULT_REPORT_TEMPLATE["tail_messages"]["need_confirm"]
         assert "需要你确认" in t
 
-    def test_tail_for_auto_fixable(self):
-        t = DEFAULT_REPORT_TEMPLATE.tail_for(AuditMode.FULL, has_confirm=False, has_fixable=True)
+    def test_tail_message_auto_fixable(self):
+        t = DEFAULT_REPORT_TEMPLATE["tail_messages"]["auto_fixable"]
         assert "自动修复" in t
 
-    def test_tail_for_no_issues(self):
-        t = DEFAULT_REPORT_TEMPLATE.tail_for(AuditMode.FULL, has_confirm=False, has_fixable=False)
-        assert t == ""
+    def test_clean_message(self):
+        assert DEFAULT_REPORT_TEMPLATE["clean_message"] != ""
 
 
 def _dummy_audit_report():

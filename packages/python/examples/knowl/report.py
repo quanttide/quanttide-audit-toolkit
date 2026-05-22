@@ -1,12 +1,11 @@
 import json
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from quanttide_audit import AuditReport
 
-from .models import AuditDiff, AuditIssues, AuditIssue, AuditMode, IssueGroup, KnowledgeBaseStats
+from .models import AuditIssues, AuditIssue, AuditMode, KnowledgeBaseStats
 
 
 # ── render ──────────────────────────────────────────────────────────────────
@@ -18,7 +17,7 @@ def render_report(
     mode: AuditMode,
     stats: KnowledgeBaseStats,
     issues: AuditIssues,
-    diff: Optional[AuditDiff] = None,
+    diff: Optional["AuditDiff"] = None,
     previous_timestamp: Optional[str] = None,
 ) -> None:
     _print_stats(stats)
@@ -46,7 +45,7 @@ def _print_stats(stats: KnowledgeBaseStats) -> None:
         print()
 
 
-def _print_diff(diff: Optional[AuditDiff], previous_timestamp: Optional[str]) -> None:
+def _print_diff(diff: Optional["AuditDiff"], previous_timestamp: Optional[str]) -> None:
     if not diff:
         return
     prev_time = (previous_timestamp or "未知")[:10]
@@ -73,7 +72,7 @@ class ReportRepository:
     def __init__(self, state_home: Path):
         self._path = state_home / JSON_FILE
 
-    def load_previous_state(self, mode: Optional[AuditMode] = None) -> Optional:
+    def load_previous_state(self, mode: Optional[AuditMode] = None) -> Optional[tuple]:
         if not self._path.exists():
             return None
         try:
@@ -84,11 +83,7 @@ class ReportRepository:
                 AuditIssue(category=i["category"], group=i["group"], label=i["label"], action=i.get("action", ""))
                 for i in data.get("issues", [])
             ]
-            return _PreviousAudit(
-                issues=issues,
-                timestamp=data.get("timestamp", ""),
-                mode=AuditMode(data["mode"]),
-            )
+            return (issues, data.get("timestamp", ""), AuditMode(data["mode"]))
         except Exception:
             return None
 
@@ -105,53 +100,32 @@ class ReportRepository:
         self._path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-@dataclass
-class _PreviousAudit:
-    issues: list
-    timestamp: str
-    mode: AuditMode
-
-
 # ── rendering helpers ───────────────────────────────────────────────────────
 
-@dataclass(frozen=True)
-class ReportTemplate:
-    sections_full: list[tuple]
-    sections_simple: list[tuple]
-    clean_message: str
-    summary_header: str
-    tail_messages: dict
-
-    def sections_for(self, mode):
-        return self.sections_simple if mode == AuditMode.SIMPLE else self.sections_full
-
-    def tail_for(self, mode, has_confirm, has_fixable):
-        if mode == AuditMode.SIMPLE:
-            return self.tail_messages.get("simple", "")
-        if has_confirm:
-            return self.tail_messages.get("need_confirm", "")
-        if has_fixable:
-            return self.tail_messages.get("auto_fixable", "")
-        return ""
-
-
-DEFAULT_REPORT_TEMPLATE = ReportTemplate(
-    sections_full=[
+DEFAULT_REPORT_TEMPLATE = {
+    "sections_full": [
         ("need_confirm", "需要你确认的问题", "以下问题平台无法自动判断，需要你决定如何处理。"),
         ("auto_fixable", "平台发现的问题", "以下问题平台已识别，可通过自动修复处理。"),
     ],
-    sections_simple=[
+    "sections_simple": [
         ("need_confirm", "建议关注", "以下问题可由平台自动修复，无需手动处理。"),
         ("auto_fixable", "平台发现的问题", "以下问题平台已识别，可通过自动修复处理。"),
     ],
-    clean_message="✓ 未发现问题，知识库结构良好。",
-    summary_header="  汇总",
-    tail_messages={
+    "clean_message": "✓ 未发现问题，知识库结构良好。",
+    "summary_header": "  汇总",
+    "tail_messages": {
         "simple": "当前为快速检查模式，运行 qtcloud-knowl audit --mode full 进行全面审计。",
         "need_confirm": "请先处理「需要你确认的问题」，其他问题可并行处理。",
         "auto_fixable": "运行 qtcloud-knowl auto-fix 自动修复平台发现的问题。",
     },
-)
+}
+
+
+def _group_issues(issues):
+    groups = {}
+    for i in issues:
+        groups.setdefault(i.group, []).append(i)
+    return list(groups.items())
 
 
 def _print_group(title: str, issues: list) -> None:
@@ -163,35 +137,45 @@ def _print_group(title: str, issues: list) -> None:
     print()
 
 
-def _print_section(header: str, desc: str, groups: list[IssueGroup]) -> None:
+def _print_section(header: str, desc: str, groups: list) -> None:
     if not groups:
         return
     print(f"━━━ {header} ━━━")
     print(f"{desc}\n")
-    for group in groups:
-        _print_group(group.group_name, group.issues)
+    for name, issues in groups:
+        _print_group(name, issues)
+
+
+def _tail_message(template, mode, has_confirm, has_fixable):
+    if mode == AuditMode.SIMPLE:
+        return template["tail_messages"].get("simple", "")
+    if has_confirm:
+        return template["tail_messages"].get("need_confirm", "")
+    if has_fixable:
+        return template["tail_messages"].get("auto_fixable", "")
+    return ""
 
 
 def _print_report_to_stdout(issues: AuditIssues, template=None) -> None:
     template = template or DEFAULT_REPORT_TEMPLATE
     has_problems = bool(issues.need_confirm or issues.auto_fixable)
-    sections = template.sections_for(issues.mode)
+    sections = template["sections_simple"] if issues.mode == AuditMode.SIMPLE else template["sections_full"]
 
     if has_problems:
-        for section in sections:
-            key, header, description = section
-            groups = issues.section_groups(key)
+        for key, header, desc in sections:
+            source = {"need_confirm": issues.need_confirm, "auto_fixable": issues.auto_fixable}.get(key)
+            groups = _group_issues(source) if source else []
             if groups:
-                _print_section(header, description, groups)
+                _print_section(header, desc, groups)
 
         print("=" * 60)
-        print(template.summary_header)
+        print(template["summary_header"])
         print("=" * 60)
         print(f"  · 需要你确认: {len(issues.need_confirm)} 项")
         print(f"  · 平台可修复: {len(issues.auto_fixable)} 项")
         print(f"  · 建议关注:   {len(issues.suggestions)} 项")
         print()
-        tail = template.tail_for(issues.mode, bool(issues.need_confirm), bool(issues.auto_fixable))
+        tail = _tail_message(template, issues.mode, bool(issues.need_confirm), bool(issues.auto_fixable))
         if tail:
             print(tail)
 
@@ -200,8 +184,8 @@ def _print_report_to_stdout(issues: AuditIssues, template=None) -> None:
             "建议关注",
             "以下优化建议在全面审计模式下提供。" if issues.mode.value == "full"
             else "以下问题在快速模式下仅供参考，切换到 --mode full 进行全面审计。",
-            issues.section_groups("suggestions"),
+            _group_issues(issues.suggestions),
         )
 
     if not has_problems and not issues.suggestions:
-        print(template.clean_message)
+        print(template["clean_message"])

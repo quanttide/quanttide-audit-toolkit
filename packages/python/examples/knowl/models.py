@@ -10,7 +10,7 @@ class AuditMode(Enum):
     FULL = "full"
 
     @classmethod
-    def _missing_(cls, value):  # pragma: no cover
+    def _missing_(cls, value):
         if isinstance(value, str):
             for member in cls:
                 if member.value == value:
@@ -56,19 +56,6 @@ class AuditDiff:
         return not self.has_changes
 
 
-@dataclass(frozen=True)
-class IssueGroup:
-    group_name: str
-    issues: list
-
-    @classmethod
-    def from_issues(cls, issues):
-        groups = {}
-        for i in issues:
-            groups.setdefault(i.group, []).append(i)
-        return [cls(group_name=name, issues=lst) for name, lst in groups.items()]
-
-
 @dataclass
 class KnowledgeBaseStats:
     data_dir: Path
@@ -99,15 +86,3 @@ class AuditIssues:
             need_confirm = auto_fixable
             auto_fixable = []
         return cls(need_confirm=need_confirm, auto_fixable=auto_fixable, suggestions=suggestions, mode=mode)
-
-    @property
-    def is_clean(self) -> bool:
-        return not self.need_confirm and not self.auto_fixable
-
-    @property
-    def exit_code(self) -> int:
-        return 0 if self.is_clean else 1
-
-    def section_groups(self, key):
-        issues = {"need_confirm": self.need_confirm, "auto_fixable": self.auto_fixable, "suggestions": self.suggestions}.get(key, [])
-        return IssueGroup.from_issues(issues)

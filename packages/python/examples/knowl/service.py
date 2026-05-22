@@ -163,9 +163,9 @@ def run(data_dir: Optional[str] = None, mode: str = "full") -> int:
     diff = None
     prev_ts = None
     if previous:
-        diff = _AuditDiff.compute(previous.issues, all_raw, previous.timestamp)
-        prev_ts = previous.timestamp
+        prev_issues, prev_ts, _ = previous
+        diff = _AuditDiff.compute(prev_issues, all_raw, prev_ts)
 
     repo.save_report(audit_report, issues)
     render_report(report=audit_report, mode=mode_vo, stats=stats, issues=issues, diff=diff, previous_timestamp=prev_ts)
-    return issues.exit_code
+    return 0 if not issues.need_confirm and not issues.auto_fixable else 1

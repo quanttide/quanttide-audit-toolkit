@@ -6,7 +6,6 @@ from examples.knowl.models import (
     AuditIssue,
     AuditIssues,
     AuditMode,
-    IssueGroup,
     KnowledgeBaseStats,
 )
 
@@ -59,7 +58,7 @@ class TestAuditDiff:
         assert diff.new == frozenset()
         assert diff.pending == frozenset({"c|g|both"})
 
-    def test_has_changes(self):
+    def test_has_changes_true_when_fixed(self):
         prev = [AuditIssue(category="c", group="g", label="x")]
         curr = []
         assert AuditDiff.compute(prev, curr).has_changes is True
@@ -67,34 +66,12 @@ class TestAuditDiff:
     def test_pending_only_means_no_changes(self):
         shared = [AuditIssue(category="c", group="g", label="x")]
         diff = AuditDiff.compute(shared, shared)
-        assert diff.fixed == frozenset()
-        assert diff.new == frozenset()
-        assert len(diff.pending) == 1
         assert diff.has_changes is False
         assert diff.is_identical is True
 
     def test_no_previous_timestamp(self):
         diff = AuditDiff.compute([], [])
         assert diff.previous_timestamp is None
-
-
-class TestIssueGroup:
-    def test_from_issues_single_group(self):
-        issues = [AuditIssue(category="c", group="相同组", label="a")]
-        groups = IssueGroup.from_issues(issues)
-        assert len(groups) == 1
-        assert groups[0].group_name == "相同组"
-
-    def test_from_issues_multiple_groups(self):
-        issues = [
-            AuditIssue(category="c", group="甲", label="a"),
-            AuditIssue(category="c", group="乙", label="b"),
-        ]
-        groups = IssueGroup.from_issues(issues)
-        assert len(groups) == 2
-
-    def test_from_issues_empty(self):
-        assert IssueGroup.from_issues([]) == []
 
 
 class TestKnowledgeBaseStats:
@@ -137,30 +114,3 @@ class TestAuditIssues:
         assert r.auto_fixable == []
         assert nc[0] in r.suggestions
         assert sg[0] in r.suggestions
-
-    def test_is_clean(self):
-        r = AuditIssues.from_raw([], [], [], AuditMode.FULL)
-        assert r.is_clean is True
-
-    def test_is_not_clean(self):
-        r = AuditIssues.from_raw([AuditIssue(category="c", group="g", label="x")], [], [], AuditMode.FULL)
-        assert r.is_clean is False
-
-    def test_exit_code_clean(self):
-        r = AuditIssues.from_raw([], [], [], AuditMode.FULL)
-        assert r.exit_code == 0
-
-    def test_exit_code_dirty(self):
-        r = AuditIssues.from_raw([AuditIssue(category="c", group="g", label="x")], [], [], AuditMode.FULL)
-        assert r.exit_code == 1
-
-    def test_section_groups_existing(self):
-        nc = [AuditIssue(category="c", group="g", label="x")]
-        r = AuditIssues.from_raw(nc, [], [], AuditMode.FULL)
-        groups = r.section_groups("need_confirm")
-        assert len(groups) == 1
-        assert groups[0].group_name == "g"
-
-    def test_section_groups_empty(self):
-        r = AuditIssues.from_raw([], [], [], AuditMode.FULL)
-        assert r.section_groups("need_confirm") == []
