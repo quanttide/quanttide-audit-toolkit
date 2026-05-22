@@ -4,7 +4,8 @@ from pathlib import Path
 
 from quanttide_audit import AuditCriteria, AuditFinding, AuditReport, AuditSeverity
 
-from .report import render_report, ReportRepository
+from .render import render_report
+from .repository import ReportRepository
 
 
 TS = "2026-01-01T00:00:00"
