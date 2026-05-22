@@ -18,18 +18,18 @@ def _make_findings():
 
 
 class TestRun:
-    def test_full_mode(self):
-        code = run(_make_findings(), mode="full")
+    def test_full_mode(self, tmp_path):
+        code = run(_make_findings(), mode="full", state_dir=tmp_path)
         assert code == 1
 
-    def test_simple_mode(self):
-        code = run(_make_findings(), mode="simple")
+    def test_simple_mode(self, tmp_path):
+        code = run(_make_findings(), mode="simple", state_dir=tmp_path)
         assert code == 1
 
-    def test_invalid_mode(self):
-        code = run([], mode="unknown")
+    def test_invalid_mode(self, tmp_path):
+        code = run([], mode="unknown", state_dir=tmp_path)
         assert code == 1
 
-    def test_clean_report(self):
-        code = run([], mode="full")
+    def test_clean_report(self, tmp_path):
+        code = run([], mode="full", state_dir=tmp_path)
         assert code == 0

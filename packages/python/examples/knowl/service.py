@@ -65,7 +65,7 @@ def _finding_key(f: AuditFinding) -> str:
     return f"{f.severity.value}|{f.criterion.name}|{f.title}|{f.description or ''}"
 
 
-def run(findings: list[AuditFinding], mode: str = "full") -> int:
+def run(findings: list[AuditFinding], mode: str = "full", state_dir: Path = Path.home() / ".quanttide" / "audit") -> int:
     if mode not in ("simple", "full"):
         print(f"不支持的审计模式 '{mode}'，仅支持 simple / full")
         return 1
@@ -76,7 +76,7 @@ def run(findings: list[AuditFinding], mode: str = "full") -> int:
         created_at=TS, updated_at=TS,
     )
 
-    repo = ReportRepository(Path.home() / ".quanttide" / "audit")
+    repo = ReportRepository(state_dir)
     previous = repo.load_previous_state(mode=mode)
     diff = None
     prev_ts = None
