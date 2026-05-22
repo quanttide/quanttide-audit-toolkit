@@ -4,8 +4,8 @@ from pathlib import Path
 from examples.knowl.models import (
     AuditDiff,
     AuditIssue,
+    AuditIssues,
     AuditMode,
-    AuditReport,
     IssueGroup,
     KnowledgeBaseStats,
 )
@@ -116,12 +116,12 @@ class TestKnowledgeBaseStats:
         assert stats.instance_count == 2
 
 
-class TestAuditReport:
+class TestAuditIssues:
     def test_from_raw_full(self):
         nc = [AuditIssue(category="need_confirm", group="g", label="nc")]
         af = [AuditIssue(category="auto_fixable", group="g", label="af")]
         sg = [AuditIssue(category="suggestions", group="g", label="sg")]
-        r = AuditReport.from_raw(nc, af, sg, AuditMode.FULL)
+        r = AuditIssues.from_raw(nc, af, sg, AuditMode.FULL)
         assert r.need_confirm == nc
         assert r.auto_fixable == af
         assert r.suggestions == sg
@@ -130,35 +130,35 @@ class TestAuditReport:
         nc = [AuditIssue(category="need_confirm", group="g", label="nc")]
         af = [AuditIssue(category="auto_fixable", group="g", label="af")]
         sg = [AuditIssue(category="suggestions", group="g", label="sg")]
-        r = AuditReport.from_raw(nc, af, sg, AuditMode.SIMPLE)
+        r = AuditIssues.from_raw(nc, af, sg, AuditMode.SIMPLE)
         assert r.need_confirm == af
         assert r.auto_fixable == []
         assert nc[0] in r.suggestions
         assert sg[0] in r.suggestions
 
     def test_is_clean(self):
-        r = AuditReport.from_raw([], [], [], AuditMode.FULL)
+        r = AuditIssues.from_raw([], [], [], AuditMode.FULL)
         assert r.is_clean is True
 
     def test_is_not_clean(self):
-        r = AuditReport.from_raw([AuditIssue(category="c", group="g", label="x")], [], [], AuditMode.FULL)
+        r = AuditIssues.from_raw([AuditIssue(category="c", group="g", label="x")], [], [], AuditMode.FULL)
         assert r.is_clean is False
 
     def test_exit_code_clean(self):
-        r = AuditReport.from_raw([], [], [], AuditMode.FULL)
+        r = AuditIssues.from_raw([], [], [], AuditMode.FULL)
         assert r.exit_code == 0
 
     def test_exit_code_dirty(self):
-        r = AuditReport.from_raw([AuditIssue(category="c", group="g", label="x")], [], [], AuditMode.FULL)
+        r = AuditIssues.from_raw([AuditIssue(category="c", group="g", label="x")], [], [], AuditMode.FULL)
         assert r.exit_code == 1
 
     def test_section_groups_existing(self):
         nc = [AuditIssue(category="c", group="g", label="x")]
-        r = AuditReport.from_raw(nc, [], [], AuditMode.FULL)
+        r = AuditIssues.from_raw(nc, [], [], AuditMode.FULL)
         groups = r.section_groups("need_confirm")
         assert len(groups) == 1
         assert groups[0].group_name == "g"
 
     def test_section_groups_empty(self):
-        r = AuditReport.from_raw([], [], [], AuditMode.FULL)
+        r = AuditIssues.from_raw([], [], [], AuditMode.FULL)
         assert r.section_groups("need_confirm") == []

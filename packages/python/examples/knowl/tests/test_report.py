@@ -1,8 +1,7 @@
-import json
 from pathlib import Path
 
-from examples.knowl.models import AuditIssue, AuditMode, AuditReport as AuditIssues
-from examples.knowl.report import DEFAULT_REPORT_TEMPLATE, Report, ReportRepository
+from examples.knowl.models import AuditDiff, AuditIssue, AuditIssues, AuditMode
+from examples.knowl.report import DEFAULT_REPORT_TEMPLATE, ReportRepository
 
 
 def _make_issues(**kw):
@@ -12,36 +11,6 @@ def _make_issues(**kw):
     return AuditIssues.from_raw(**data)
 
 
-class TestReport:
-    def test_build_without_previous(self):
-        issues = _make_issues()
-        r = Report.build(AuditMode.FULL, None, issues.need_confirm, issues.auto_fixable, issues.suggestions)
-        assert r.mode == AuditMode.FULL
-        assert r.diff is None
-        assert r.previous_timestamp is None
-
-    def test_build_with_previous(self):
-        prev = _make_issues()
-        cur = _make_issues()
-        r = Report.build(
-            AuditMode.FULL, None, cur.need_confirm, cur.auto_fixable, cur.suggestions,
-            previous_state=_PreviousAudit(prev.need_confirm, "2026-01-01"),
-        )
-        assert r.diff is not None
-        assert r.previous_timestamp == "2026-01-01"
-        assert len(r.diff.pending) == 1
-        assert len(r.diff.fixed) == 0
-        assert len(r.diff.new) == 0
-
-    def test_exit_code(self):
-        r = Report.build(AuditMode.FULL, None, [], [], [])
-        assert r.exit_code == 0
-
-        dirty = _make_issues()
-        r = Report.build(AuditMode.FULL, None, dirty.need_confirm, dirty.auto_fixable, dirty.suggestions)
-        assert r.exit_code == 1
-
-
 class TestReportRepository:
     def test_load_no_state(self, tmp_path):
         repo = ReportRepository(tmp_path)
@@ -49,20 +18,18 @@ class TestReportRepository:
 
     def test_save_then_load(self, tmp_path):
         issues = _make_issues()
-        r = Report.build(AuditMode.FULL, None, issues.need_confirm, issues.auto_fixable, issues.suggestions)
-
         repo = ReportRepository(tmp_path)
-        repo.save_report(r)
+        report = _dummy_audit_report()
+        repo.save_report(report, issues)
 
         loaded = repo.load_previous_state()
         assert loaded is not None
         assert loaded.mode == AuditMode.FULL
 
     def test_load_with_mode_mismatch(self, tmp_path):
-        issues = _make_issues()
-        r = Report.build(AuditMode.SIMPLE, None, issues.need_confirm, issues.auto_fixable, issues.suggestions)
+        issues = _make_issues(mode=AuditMode.SIMPLE)
         repo = ReportRepository(tmp_path)
-        repo.save_report(r)
+        repo.save_report(_dummy_audit_report(), issues)
         assert repo.load_previous_state(mode=AuditMode.FULL) is None
 
     def test_load_corrupted_file(self, tmp_path):
@@ -95,8 +62,10 @@ class TestReportTemplate:
         assert t == ""
 
 
-class _PreviousAudit:
-    def __init__(self, issues, timestamp, mode=AuditMode.FULL):
-        self.issues = issues
-        self.timestamp = timestamp
-        self.mode = mode
+def _dummy_audit_report():
+    from uuid import uuid4
+    from quanttide_audit import AuditReport
+    return AuditReport(
+        id=uuid4(), name="dummy", title="Dummy",
+        findings=[], created_at="2026-01-01T00:00:00", updated_at="2026-01-01T00:00:00",
+    )

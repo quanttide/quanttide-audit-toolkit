@@ -86,7 +86,7 @@ class KnowledgeBaseStats:
 
 
 @dataclass
-class AuditReport:
+class AuditIssues:
     need_confirm: list
     auto_fixable: list
     suggestions: list

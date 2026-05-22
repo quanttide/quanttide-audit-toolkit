@@ -1,12 +1,37 @@
+from uuid import uuid4
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from quanttide_audit import AuditReport
+
 from .tools import all_detection_tools
-from .models import AuditMode, AuditIssue, KnowledgeBaseStats
+from .models import AuditIssues, AuditIssue, AuditMode, KnowledgeBaseStats
 from .parser import ToolOutputParser
-from .report import Report, ReportRepository
+from .models import AuditDiff as _AuditDiff
+from .report import render_report, ReportRepository
 from .config import settings
 from .loader import load_all_domains
+
+
+TS = "2026-01-01T00:00:00"
+
+
+def _to_finding(issue: AuditIssue):
+    from quanttide_audit import AuditEvidence, AuditFinding, AuditSeverity, AuditCriteria
+
+    sev_map = {"need_confirm": AuditSeverity.MAJOR, "auto_fixable": AuditSeverity.MINOR, "suggestions": AuditSeverity.OBSERVATION}
+    return AuditFinding(
+        id=uuid4(),
+        name=issue.group,
+        title=issue.label,
+        criterion=AuditCriteria(id=uuid4(), name=issue.group, title=issue.group, description=issue.group, created_at=TS, updated_at=TS),
+        evidence=[AuditEvidence(id=uuid4(), name=f"ev-{issue.group}", title=issue.label, description=issue.action, created_at=TS, updated_at=TS)],
+        severity=sev_map.get(issue.category, AuditSeverity.OBSERVATION),
+        description=issue.action or None,
+        created_at=TS,
+        updated_at=TS,
+    )
 
 
 def _collect_stats(ddir):
@@ -90,11 +115,23 @@ def run(data_dir: Optional[str] = None, mode: str = "full") -> int:
 
     stats = _collect_stats(ddir)
     need_confirm, auto_fixable, suggestions = _run_tools(ddir, mode_vo)
+    issues = AuditIssues.from_raw(need_confirm, auto_fixable, suggestions, mode_vo)
+    all_raw = need_confirm + auto_fixable + suggestions
+
+    audit_report = AuditReport(
+        id=uuid4(), name=f"knowl-audit-{datetime.now().isoformat()[:10]}", title="知识库审计报告",
+        findings=[_to_finding(i) for i in all_raw],
+        created_at=TS, updated_at=TS,
+    )
 
     repo = ReportRepository(settings.state_home)
     previous = repo.load_previous_state(mode=mode_vo)
+    diff = None
+    prev_ts = None
+    if previous:
+        diff = _AuditDiff.compute(previous.issues, all_raw, previous.timestamp)
+        prev_ts = previous.timestamp
 
-    report = Report.build(mode_vo, stats, need_confirm, auto_fixable, suggestions, previous_state=previous)
-    repo.save_report(report)
-    report.render()
-    return report.exit_code
+    repo.save_report(audit_report, issues)
+    render_report(report=audit_report, mode=mode_vo, stats=stats, issues=issues, diff=diff, previous_timestamp=prev_ts)
+    return issues.exit_code

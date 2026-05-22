@@ -1,86 +1,70 @@
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .models import AuditMode, AuditDiff, AuditReport as AuditIssues, IssueGroup, AuditIssue, KnowledgeBaseStats
+from quanttide_audit import AuditReport
+
+from .models import AuditDiff, AuditIssues, AuditIssue, AuditMode, IssueGroup, KnowledgeBaseStats
 
 
-# ── domain model ──────────────────────────────────────────────────────────
+# ── render ──────────────────────────────────────────────────────────────────
 
-@dataclass
-class Report:
-    mode: AuditMode
-    stats: KnowledgeBaseStats
-    issues: AuditIssues
-    diff: Optional[AuditDiff] = None
-    previous_timestamp: Optional[str] = None
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    @classmethod
-    def build(cls, mode, stats, need_confirm, auto_fixable, suggestions, previous_state=None):
-        issues = AuditIssues.from_raw(need_confirm, auto_fixable, suggestions, mode)
-        diff = None
-        prev_ts = None
-        if previous_state:
-            current_all = issues.need_confirm + issues.auto_fixable + issues.suggestions
-            diff = AuditDiff.compute(previous_state.issues, current_all, previous_state.timestamp)
-            prev_ts = previous_state.timestamp
-        return cls(mode=mode, stats=stats, issues=issues, diff=diff, previous_timestamp=prev_ts)
+def render_report(
+    *,
+    report: AuditReport,
+    mode: AuditMode,
+    stats: KnowledgeBaseStats,
+    issues: AuditIssues,
+    diff: Optional[AuditDiff] = None,
+    previous_timestamp: Optional[str] = None,
+) -> None:
+    _print_stats(stats)
+    print("=" * 60)
+    print("  检测结果")
+    print("=" * 60)
+    print()
+    _print_diff(diff, previous_timestamp)
+    _print_report_to_stdout(issues)
 
-    @property
-    def exit_code(self) -> int:
-        return self.issues.exit_code
 
-    # ── rendering ─────────────────────────────────────────────────────────
-
-    def render(self) -> None:
-        self._print_stats()
-        print("=" * 60)
-        print("  检测结果")
-        print("=" * 60)
-        print()
-        self._print_diff()
-        self._print_issues()
-
-    def _print_stats(self) -> None:
-        print("=" * 60)
-        print("  知识库概览")
-        print("=" * 60)
-        print(f"\n  数据目录: {self.stats.data_dir}")
-        print(f"  领域数量: {self.stats.domain_count}")
-        print(f"  本体数量: {self.stats.ontology_count}")
-        print(f"  实例数量: {self.stats.instance_count}")
-        print()
-        if self.stats.has_domains:
-            print("  领域清单:")
-            for domain in self.stats.domains:
-                print(f"    {str(domain.id):<20} {domain.name:<12}")
-            print()
-
-    def _print_diff(self) -> None:
-        if not self.diff:
-            return
-        prev_time = (self.previous_timestamp or "未知")[:10]
-        if self.diff.has_changes:
-            parts = []
-            if self.diff.fixed:
-                parts.append(f"✅ 已修复 {len(self.diff.fixed)} 项")
-            if self.diff.new:
-                parts.append(f"🆕 新增 {len(self.diff.new)} 项")
-            if self.diff.pending:
-                parts.append(f"⏳ 待处理 {len(self.diff.pending)} 项")
-            print(f"相比上次审计（{prev_time}）：{' / '.join(parts)}")
-        else:
-            print(f"✓ 与上次审计一致，无新增问题（{prev_time}）")
+def _print_stats(stats: KnowledgeBaseStats) -> None:
+    print("=" * 60)
+    print("  知识库概览")
+    print("=" * 60)
+    print(f"\n  数据目录: {stats.data_dir}")
+    print(f"  领域数量: {stats.domain_count}")
+    print(f"  本体数量: {stats.ontology_count}")
+    print(f"  实例数量: {stats.instance_count}")
+    print()
+    if stats.has_domains:
+        print("  领域清单:")
+        for domain in stats.domains:
+            print(f"    {str(domain.id):<20} {domain.name:<12}")
         print()
 
-    def _print_issues(self) -> None:
-        _print_report_to_stdout(self.issues)
+
+def _print_diff(diff: Optional[AuditDiff], previous_timestamp: Optional[str]) -> None:
+    if not diff:
+        return
+    prev_time = (previous_timestamp or "未知")[:10]
+    if diff.has_changes:
+        parts = []
+        if diff.fixed:
+            parts.append(f"✅ 已修复 {len(diff.fixed)} 项")
+        if diff.new:
+            parts.append(f"🆕 新增 {len(diff.new)} 项")
+        if diff.pending:
+            parts.append(f"⏳ 待处理 {len(diff.pending)} 项")
+        print(f"相比上次审计（{prev_time}）：{' / '.join(parts)}")
+    else:
+        print(f"✓ 与上次审计一致，无新增问题（{prev_time}）")
+    print()
 
 
-# ── repository ────────────────────────────────────────────────────────────
+# ── repository ──────────────────────────────────────────────────────────────
 
 JSON_FILE = "audit.json"
 
@@ -90,7 +74,6 @@ class ReportRepository:
         self._path = state_home / JSON_FILE
 
     def load_previous_state(self, mode: Optional[AuditMode] = None) -> Optional:
-        """Load the previous audit's issue list for diff computation."""
         if not self._path.exists():
             return None
         try:
@@ -109,13 +92,13 @@ class ReportRepository:
         except Exception:
             return None
 
-    def save_report(self, report: Report) -> None:
+    def save_report(self, report: AuditReport, issues: AuditIssues) -> None:
         data = {
-            "timestamp": report.timestamp,
-            "mode": report.mode.value,
+            "timestamp": datetime.now().isoformat(),
+            "mode": issues.mode.value,
             "issues": [
                 {"category": i.category, "group": i.group, "label": i.label, "action": i.action}
-                for i in (report.issues.need_confirm + report.issues.auto_fixable + report.issues.suggestions)
+                for i in (issues.need_confirm + issues.auto_fixable + issues.suggestions)
             ],
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -129,8 +112,7 @@ class _PreviousAudit:
     mode: AuditMode
 
 
-# ── rendering helpers (kept separate for testability) ─────────────────────
-# These are extracted from the old print_report; they operate on AuditIssues.
+# ── rendering helpers ───────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class ReportSectionDef:
@@ -157,7 +139,7 @@ class ReportTemplate:
             return self.tail_messages.get("need_confirm", "")
         if has_fixable:
             return self.tail_messages.get("auto_fixable", "")
-        return ""  # pragma: no cover
+        return ""
 
 
 DEFAULT_REPORT_TEMPLATE = ReportTemplate(
@@ -197,35 +179,35 @@ def _print_section(header: str, desc: str, groups: list[IssueGroup]) -> None:
         _print_group(group.group_name, group.issues)
 
 
-def _print_report_to_stdout(report: AuditIssues, template=None) -> None:
+def _print_report_to_stdout(issues: AuditIssues, template=None) -> None:
     template = template or DEFAULT_REPORT_TEMPLATE
-    has_problems = bool(report.need_confirm or report.auto_fixable)
-    sections = template.sections_for(report.mode)
+    has_problems = bool(issues.need_confirm or issues.auto_fixable)
+    sections = template.sections_for(issues.mode)
 
     if has_problems:
         for section in sections:
-            groups = report.section_groups(section.key)
+            groups = issues.section_groups(section.key)
             if groups:
                 _print_section(section.header, section.description, groups)
 
         print("=" * 60)
         print(template.summary_header)
         print("=" * 60)
-        print(f"  · 需要你确认: {len(report.need_confirm)} 项")
-        print(f"  · 平台可修复: {len(report.auto_fixable)} 项")
-        print(f"  · 建议关注:   {len(report.suggestions)} 项")
+        print(f"  · 需要你确认: {len(issues.need_confirm)} 项")
+        print(f"  · 平台可修复: {len(issues.auto_fixable)} 项")
+        print(f"  · 建议关注:   {len(issues.suggestions)} 项")
         print()
-        tail = template.tail_for(report.mode, bool(report.need_confirm), bool(report.auto_fixable))
+        tail = template.tail_for(issues.mode, bool(issues.need_confirm), bool(issues.auto_fixable))
         if tail:
             print(tail)
 
-    if report.suggestions:
+    if issues.suggestions:
         _print_section(
             "建议关注",
-            "以下优化建议在全面审计模式下提供。" if report.mode.value == "full"
+            "以下优化建议在全面审计模式下提供。" if issues.mode.value == "full"
             else "以下问题在快速模式下仅供参考，切换到 --mode full 进行全面审计。",
-            report.section_groups("suggestions"),
+            issues.section_groups("suggestions"),
         )
 
-    if not has_problems and not report.suggestions:
+    if not has_problems and not issues.suggestions:
         print(template.clean_message)
