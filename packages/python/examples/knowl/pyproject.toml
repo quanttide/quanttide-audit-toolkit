@@ -1,3 +1,8 @@
+[project]
+name = "knowl-audit-example"
+version = "0.1.0"
+description = "知识库质量审计示例 — 基于 quanttide-audit-toolkit"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["../.."]
