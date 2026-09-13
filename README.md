@@ -7,7 +7,7 @@
 | 平台 | 状态 | 路径 |
 |------|------|------|
 | Python | ✅ v0.1.0 | [packages/python](packages/python) |
-| Rust | ✅ v0.1.0 | [packages/rust](packages/rust) |
+| Rust | ✅ v0.1.0-alpha.1 | [packages/rust](packages/rust) |
 
 ## 数据模型
 
