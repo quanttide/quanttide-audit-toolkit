@@ -1,0 +1,14 @@
+[package]
+name = "quanttide-audit"
+version = "0.1.0"
+edition = "2024"
+description = "审计领域 Rust 语言工具包"
+license = "Apache-2.0"
+repository = "https://github.com/quanttide/quanttide-audit-toolkit"
+readme = "README.md"
+keywords = ["quanttide", "audit", "toolkit"]
+categories = ["development-tools"]
+
+[lib]
+name = "quanttide_audit"
+path = "src/lib.rs"
