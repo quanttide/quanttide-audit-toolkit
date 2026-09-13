@@ -10,10 +10,17 @@ packages/rust/
 ├── Cargo.toml         # Rust 包配置
 ├── README.md          # 项目说明
 ├── src/
-│   └── lib.rs         # 出口：领域常量与版本（模型就绪后按子领域分文件）
+│   ├── lib.rs         # 出口：领域常量、版本与四个聚合
+│   ├── criteria/      # 审计标准
+│   ├── evidence/      # 审计证据
+│   ├── finding/       # 审计发现（含严重程度）
+│   └── report/        # 审计报告
 └── tests/
-    └── package.rs     # 集成测试
+    ├── package.rs     # 领域常量与版本
+    └── criteria.rs / evidence.rs / finding.rs / report.rs   # 各聚合的集成测试
 ```
+
+一个聚合一个模块：模块内 `mod.rs` 声明、模型在 `model.rs`，`lib.rs` 重导出全部公共类型；新增聚合照此加一个模块与一份同名测试。
 
 ## 事实源
 
